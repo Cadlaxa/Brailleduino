@@ -200,6 +200,7 @@ String brailleToChar(byte bits) {
         } else { // first press → next number
             numPressedOnce = true;
             nextNumber = true;
+            numberLock = false;
             lcd.setCursor(cursorPos, 1);
             lcd.print("#");
             indicatorLength = 1;
@@ -209,6 +210,13 @@ String brailleToChar(byte bits) {
         }
     }
     if (pattern != 0b111100) numPressedOnce = false;
+
+    // ---- TRIGGER NUMBERS ----
+    if (nextNumber || numberLock || numPressedOnce) {
+        currentMode = NUMBER;
+        nextNumber = false;
+        clearTempIndicator();
+    }
 
     // ---- AUTO MODE DETECTION ----
     if (currentMode == AUTO && pattern != 0) {
@@ -269,12 +277,6 @@ String brailleToChar(byte bits) {
         nextCapital = false;
         clearTempIndicator();
     }
-    // ---- TRIGGER NUMBERS ----
-    if (nextNumber || numberLock) {
-        nextNumber = false;
-        clearTempIndicator();
-    }
-
     return out;
 }
 
@@ -337,6 +339,7 @@ void loop() {
       lcd.print(" ");
       if (cursorPos < 15) cursorPos++;
       // Reset
+      currentMode = TEXT;
       capsLock = false;
       nextCapital = false;
       nextNumber = false;

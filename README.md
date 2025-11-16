@@ -10,7 +10,7 @@ Braille to Text device for deciphering braille system to readable text format
 - [x] Braille to English System
 - [x] Mode functions `(AUTO, TEXT, SPECIAL, NUMBER)`
 - [x] Capitalization Marker `dot6`
-- [ ] Number trigger `dot3 + dot4 + dot5 + dot6`
+- [x] Number trigger `dot3 + dot4 + dot5 + dot6`
 - [ ] Sliding text
 - [ ] Send data to device
 - [ ] Insert/delete function
