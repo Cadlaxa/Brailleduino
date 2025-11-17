@@ -11,13 +11,14 @@ Braille to Text device for deciphering braille system to readable text format
 - [x] Mode functions `(AUTO, TEXT, SPECIAL, NUMBER)`
 - [x] Capitalization Marker `dot6`
 - [x] Number trigger `dot3 + dot4 + dot5 + dot6`
+- [x] Special character trigger `dot4 + dot5 + dot6`
 - [x] Sliding text
 - [x] Uncontracted braille
-- [ ] Contracted braille (semi working)
+- [x] Contracted braille
 - [ ] Send data to device (via blueetooth)
 - [x] Insert/delete function
 - [ ] Accent markers
-- [ ] Context based punctuation markers
+- [ ] Context based punctuation markers (semi working)
 - [x] 5th sequence and other contractions 
 - [x] Save string to memory
 - [x] Load string from memory

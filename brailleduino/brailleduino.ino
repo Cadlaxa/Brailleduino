@@ -31,7 +31,10 @@ bool nextCapital = false;
 bool capsLock = false;
 bool nextNumber = false;
 bool numberLock = false;
+bool nextSpecial = false;
+bool specialLock = false;
 bool dot6PressedOnce = false;
+bool specialPressedOnce = false;
 bool numPressedOnce = false;
 int indicatorLength = 0;
 
@@ -43,16 +46,6 @@ unsigned long nextRepeatTime = 0;
 
 enum Mode { AUTO, TEXT, NUMBER, SPECIAL };
 Mode currentMode = AUTO;
-
-// contraction arrays (kept for possible future use)
-const uint8_t contractionKeys[] = {
-  0b110011, 0b000010, 0b000110, 0b010010, 0b110010,
-  0b010110, 0b110110, 0b100110, 0b110100, 0b001100
-};
-const char* contractionValues[] = {
-  "ou","ea","bb","cc","dd","ff","gg","in","by","st"
-};
-const int contractionCount = sizeof(contractionKeys)/sizeof(contractionKeys[0]);
 
 // ---------- Utility: reorder bits (keeps API consistent) ----------
 byte reorderBraille(byte bits) {
@@ -132,8 +125,19 @@ String brailleToText(byte b) {
     case 0b101010: return "ow";
     case 0b100010: return "en";
     case 0b011100: return "ar";
+
+    case 0b110011: return "ou";
+    case 0b10: return "ea";
+    case 0b110: return "bb";
+    case 0b10010: return "cc";
+    case 0b110010: return "dd";
+    case 0b10110: return "ff";
+    case 0b110110: return "gg";
+    case 0b100110: return "in";
+    case 0b110100: return "by";
+    case 0b1100: return "st";
   }
-  return "~"; // sentinel for not a text letter
+  return "~";
 }
 
 char brailleToNumber(byte b) {
@@ -192,9 +196,33 @@ String brailleToChar(byte bits) {
   }
   if (pattern != 0b111100) numPressedOnce = false;
 
+  // SPECIAL CHARACTER TRIGGER (dot4+5+6) -> 111000
+  if (pattern == 0b111000) {
+    if (specialPressedOnce) {
+      specialLock = true;
+      nextSpecial = false;
+      specialPressedOnce = false;
+      showTempIndicator('$', 2);
+      return "";
+    } else {
+      specialPressedOnce = true;
+      nextSpecial = true;
+      specialLock = false;
+      showTempIndicator('$', 1);
+      return "";
+    }
+  }
+  if (pattern != 0b111000) specialPressedOnce = false;
+
   if (nextNumber || numberLock) {
     currentMode = NUMBER;
     nextNumber = false;
+    clearTempIndicator();
+  }
+
+  if (nextSpecial || specialLock) {
+    currentMode = SPECIAL;
+    nextSpecial = false;
     clearTempIndicator();
   }
 
@@ -207,27 +235,49 @@ String brailleToChar(byte bits) {
 
   // Choose output based on mode
   if (currentMode == TEXT) {
-    char s = specialFromBraille(pattern);
-    if (s != '0') out = String(s);
-    else out = brailleToText(pattern);
+      out = brailleToText(pattern);
+      if (out == "~") {
+          char s = specialFromBraille(pattern);
+          if (s != '0') {
+              out = String(s);
+              currentMode = SPECIAL;  // switch to special
+          }
+          else {
+              // Not special either → number mode
+              char n = brailleToNumber(pattern);
+              if (n != '?') {
+                  out = String(n);
+                  currentMode = NUMBER;
+              }
+              else {
+                  out = "?"; // nothing matched at all
+              }
+          }
+      }
   } else if (currentMode == SPECIAL) {
-    char s = specialFromBraille(pattern);
-    if (s != '0') out = String(s);
-    else out = brailleToText(pattern);
-  } else if (currentMode == NUMBER) {
-    char n = brailleToNumber(pattern);
-    if (n != '?') out = String(n);
-    /*else {
-      // fallback to text or special
       char s = specialFromBraille(pattern);
-      if (s != '0') out = String(s);
-      else out = brailleToText(pattern);
-      // exit number mode
-      currentMode = TEXT;
-      numberLock = false;
-      nextNumber = false;
-      numPressedOnce = false;
-    }*/
+      if (s != '0') {
+          out = String(s);
+      } else {
+          out = brailleToText(pattern);
+          currentMode = TEXT;  // special failed → back to text
+      }
+  } else if (currentMode == NUMBER) {
+      char n = brailleToNumber(pattern);
+      if (n != '?') {
+          out = String(n);
+      } 
+      else {
+          // Fallback to special
+          char s = specialFromBraille(pattern);
+          if (s != '0') out = String(s);
+          else out = brailleToText(pattern);
+          // exit number mode after fallback
+          currentMode = TEXT;
+          numberLock = false;
+          nextNumber = false;
+          numPressedOnce = false;
+      }
   }
 
   // Apply capitalization
@@ -471,6 +521,8 @@ void handleKeyPress(char key) {
             nextCapital = false;
             nextNumber = false;
             numberLock = false;
+            nextSpecial = false;
+            specialLock = false;
             break;
 
         case '#': { // braille -> char
