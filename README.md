@@ -6,7 +6,7 @@ Braille to Text device for deciphering braille system to readable text format
 - @markclarence13
 - joven angeles
 
-## Todo
+## Todo: Software
 - [x] Braille to English System
 - [x] Mode functions `(AUTO, TEXT, SPECIAL, NUMBER)`
 - [x] Capitalization Marker `dot6`
@@ -14,7 +14,7 @@ Braille to Text device for deciphering braille system to readable text format
 - [x] Sliding text
 - [x] Uncontracted braille
 - [ ] Contracted braille (semi working)
-- [ ] Send data to device
+- [ ] Send data to device (via blueetooth)
 - [x] Insert/delete function
 - [ ] Accent markers
 - [ ] Context based punctuation markers
@@ -22,9 +22,19 @@ Braille to Text device for deciphering braille system to readable text format
 - [x] Save string to memory
 - [x] Load string from memory
 - [x] Hold button to trigger hold
+- [ ] Way to know the battery status and indicate it
 
-## Bugs
-- Number trigger placement in other position doesn't add to the cursor position
+## Todo: Prototype Hardware/Design
+- [x] Arduino Uno
+- [x] LCD I2C
+- [x] Keypad membrane
+- [x] Wire connectors
+- [ ] Battery
+- [ ] Blueetooth module
+- [ ] Casing
+- [ ] Prototype design
+- [ ] Type-C connector for charging
+- [ ] On/off button
 
 ## Genral Functions
 - **`Circular symbols`** = main braille pattern input
@@ -37,4 +47,3 @@ Braille to Text device for deciphering braille system to readable text format
 - **`Yellow L`** = Load string from memory
 - **`Blue buttons`** = no functions yet
 <img width="640" height="480" alt="BrailleDuino beta keypad design" src="https://github.com/user-attachments/assets/5c2b1de3-8c59-4dbd-ac14-2a38999336c0" />
-
