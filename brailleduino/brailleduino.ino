@@ -26,12 +26,15 @@ const unsigned long debounceMillis = 35;
 // EEPROM settings
 const int EEPROM_ADDR = 0;       // starting address
 const int MAX_CHARS = 128;       // we save a single 128-char line
+int loadingProgress = 0;
+unsigned long lastUpdate = 0;
 
 // Braille / editor state
 byte brailleBits = 0;
-int cursorPos = 0;           // index inside fullBuffer (0..fullBuffer.length)
+int cursorPos = 0;
 String fullBuffer = "";      // full text buffer (can be longer than 16)
 int windowStart = 0;         // left-most index shown on LCD
+bool hasContraction = false;
 bool nextCapital = false;
 bool capsLock = false;
 bool dot6PressedOnce = false;
@@ -86,7 +89,7 @@ String specialFromBraille(byte p) {
 
 const byte brailleDotsTable[] PROGMEM = {
   1,3,9,25,17,11,27,19,10,26,5,7,13,29,21,15,31,23,14,30,37,39,58,45,61,53,
-  47,63,55,46,62,33,35,41,57,49,43,59,42,34,28,51,2,6,18,50,22,54,38,52,12,44,16
+  47,63,55,46,62,33,35,41,57,49,43,59,42,34,28,51,2,6,18,50,22,54,38,52,12,44,16,40
 };
 
 const char brailleTextTable[][7] PROGMEM = {
@@ -95,7 +98,7 @@ const char brailleTextTable[][7] PROGMEM = {
   "u","v","w","x","y","z",
   "and","for","of","the","with",
   "ch","gh","sh","th","wh","ed","er","ow","en","ar",
-  "ou","ea","bb","cc","dd","ff","gg","in","by","st","ing",">"
+  "ou","ea","bb","cc","dd","ff","gg","in","by","st","ing",">","-"
 };
 String brailleToText(byte b) {
   for (int i = 0; i < sizeof(brailleDotsTable); i++) {
@@ -359,7 +362,6 @@ void insertAtCursor(char c, byte brailleCell = 0) {
     redrawLCDLine();
 }
 
-
 // backspace (remove char before cursorPos)
 void backspaceAtCursor() {
   if (cursorPos == 0) return;
@@ -418,7 +420,16 @@ void saveLineToEEPROM() {
   lcd.setCursor(0,0);
   lcd.print("Saved to MEMORY ");
   saveTone();
-  delay(1000);
+  int barWidth = 16;
+  int speed = 20; // milliseconds per step
+  for (int i = 0; i <= barWidth; i++) {
+      lcd.setCursor(0, 0); // bottom row
+      for (int j = 0; j < barWidth; j++) {
+          if (j <= i) lcd.print("#");
+          else lcd.print(" ");
+      }
+      delay(speed);
+  }
   updateLCDMode();
 }
 
@@ -436,10 +447,20 @@ void loadLineFromEEPROM() {
   while (fullBuffer.length() > 0 && fullBuffer[fullBuffer.length()-1] == ' ') fullBuffer.remove(fullBuffer.length()-1);
   cursorPos = fullBuffer.length();
   windowStart = 0;
+  lcd.clear();
   lcd.setCursor(0,0);
   lcd.print("Load from MEMORY");
   loadTone();
-  delay(1000);
+  int barWidth = 16;
+  int speed = 30; // milliseconds per step
+  for (int i = 0; i <= barWidth; i++) {
+      lcd.setCursor(0, 1); // bottom row
+      for (int j = 0; j < barWidth; j++) {
+          if (j <= i) lcd.print("#");
+          else lcd.print(" ");
+      }
+      delay(speed);
+  }
   updateLCDMode();
   scrollWindow();
   redrawLCDLine();
@@ -452,17 +473,17 @@ struct UEBContraction {
 };
 
 const UEBContraction uebContractions[] PROGMEM = {
-  {0, "ab", "about"},
+  {0, " ab", " about"},
   {0, "abv", "above"},
   {0, "acc", "according"},
   {0, "acr", "across"},
   {0, "adm", "administration"},
-  {0, "af", "after"},
+  {0, " af", " after"},
   {0, "afn", "afternoon"},
   {0, "afw", "afterward"},
-  {0, "ag", "again"},
+  {0, " ag", " again"},
   {12, "agst", "against"},
-  {0, "alm", "almost"},
+  {0, " alm", " almost"},
   {0, "alr", "already"},
   {57, "alth", "although"},
   {0, "altg", "altogether"},
@@ -478,7 +499,7 @@ const UEBContraction uebContractions[] PROGMEM = {
   {6, "bbs", "beside"},
   {6, "bbt", "between"},
   {6, "bby", "beyond"},
-  {0, "bl", "blind"},
+  {0, " bl", " blind"},
   {0, "brl", "braille"},
   {0, " b", " but"},
 
@@ -508,7 +529,7 @@ const UEBContraction uebContractions[] PROGMEM = {
   {0, " f", " from"},
 
   {0, " g", " go"},
-  {0, "gd", "good"},
+  {0, " gd", " good"},
   {0, "grt", "great"},
 
   {0, " h", " have"},
@@ -529,7 +550,7 @@ const UEBContraction uebContractions[] PROGMEM = {
 
   {0, "lr", "letter"},
   {0, " l", " like"},
-  {0, "ll", "little"},
+  {0, " ll", " little"},
   {16, ">l", "lord"},
 
   {0, " m", " more"},
@@ -547,8 +568,8 @@ const UEBContraction uebContractions[] PROGMEM = {
   {16, ">of", "oneself"},
   {0, " m", " more"},
   {51, " >ou", " ought"},
-  {40, "0d", "ound"},
-  {40, "0t", "ount"},
+  {40, "-d", "ound"},
+  {40, "-t", "ount"},
   {51, "ourvs", "ourselves"},
   {51, " ou", " out"},
 
@@ -579,8 +600,8 @@ const UEBContraction uebContractions[] PROGMEM = {
   {0, " t", " that"},
   {46, "themvs", "themselves"},
   {16, ">the", "there"},
-  {57, " th", "this"},
-  {24, "0th", "those"},
+  {57, " th", " this"},
+  {24, "-th", "those"},
   {16, ">th", "through"},
   {57, "thyf", "thyself"},
   {16, ">t", "time"},
@@ -611,58 +632,49 @@ const UEBContraction uebContractions[] PROGMEM = {
 
 const int contractionCount = sizeof(uebContractions)/sizeof(uebContractions[0]);
 
-bool checkUEBContraction(const char* buffer, byte lastDots, char* bufferOut) {
-    int bufLen = strlen(buffer);
-    char letters[8];
-    char contraction[16];
-
-    for (int i = 0; i < contractionCount; i++) {
-        byte prefix = pgm_read_byte(&(uebContractions[i].prefixDots));
-        memcpy_P(letters, uebContractions[i].letters, 8);
-        letters[7] = '\0';
-        memcpy_P(contraction, uebContractions[i].contraction, 16);
-        contraction[15] = '\0';
-
-        int lettersLen = strlen(letters);
-        if (lettersLen <= bufLen) {
-            if (strncmp(buffer + bufLen - lettersLen, letters, lettersLen) == 0) {
-                if (prefix == 0 || prefix == lastDots) {
-                    strcpy(bufferOut, contraction);
-                    return true; // found
-                }
-            }
-        }
+byte getLastNonCapitalBrailleCell(const byte *arr, int len) {
+    for (int i = len - 1; i >= 0; --i) {
+        if (arr[i] != 32) return arr[i];
     }
-    bufferOut[0] = '\0';
-    return false; // not found
+    return 0;
 }
 
-int getContractionLength(const char* buffer, byte lastDots) {
-    int bufLen = strlen(buffer);
-    int longest = 0;
+void applyCaseStyle(const char* original, char* output) {
+    int n = strlen(original);
 
-    char letters[8];
-    for (int i = 0; i < contractionCount; i++) {
-        byte prefix = pgm_read_byte(&(uebContractions[i].prefixDots));
-        memcpy_P(letters, uebContractions[i].letters, 8);
-        letters[7] = '\0';
+    bool allUpper = true;
+    bool firstUpper = false;
 
-        int lettersLen = strlen(letters);
-        if (lettersLen > bufLen) continue;
-
-        if (strncmp(buffer + bufLen - lettersLen, letters, lettersLen) == 0) {
-            if (prefix == 0 || prefix == lastDots) {
-                if (lettersLen > longest) longest = lettersLen;
-            }
+    if (n > 0 && original[0] >= 'A' && original[0] <= 'Z') {
+        firstUpper = true;
+    }
+    for (int i = 0; i < n; i++) {
+        if (!(original[i] >= 'A' && original[i] <= 'Z')) {
+            allUpper = false;
+            break;
         }
     }
-    return longest;
+    if (allUpper) {
+        for (int i = 0; output[i]; i++)
+            if (output[i] >= 'a' && output[i] <= 'z')
+                output[i] -= 32;  // to upper
+        return;
+    }
+    if (firstUpper) {
+        if (output[0] >= 'a' && output[0] <= 'z')
+            output[0] -= 32;
+        return;
+    }
+    // otherwise keep lowercase
 }
 
 void applyContraction(char* buffer, int& bufLen, byte* brailleArr = nullptr, byte prefixPassed = 0, bool front = true) {
     int bestLen = 0;
     int bestIndex = -1;
     char letters[8];
+
+    // Get last non-capital braille cell for end contraction prefix check
+    byte lastBraille = brailleArr ? getLastNonCapitalBrailleCell(brailleArr, bufLen) : 0;
 
     for (int i = 0; i < contractionCount; i++) {
         byte prefix = pgm_read_byte(&(uebContractions[i].prefixDots));
@@ -672,17 +684,29 @@ void applyContraction(char* buffer, int& bufLen, byte* brailleArr = nullptr, byt
         int lettersLen = strlen(letters);
         if (lettersLen == 0 || lettersLen > bufLen) continue;
 
-        // Check if the last letters match this contraction
-        if (strncmp(buffer + bufLen - lettersLen, letters, lettersLen) != 0) continue;
+        // Check if letters match the buffer (case-insensitive)
+        bool match = true;
+        for (int k = 0; k < lettersLen; k++) {
+            char c1 = buffer[bufLen - lettersLen + k];
+            if (c1 >= 'A' && c1 <= 'Z') c1 += 32;
+            if (c1 != letters[k]) {
+                match = false;
+                break;
+            }
+        }
+        if (!match) continue;
 
-        // Front contraction: check prefix passed
+        // Front contractions: ensure word boundary (start of buffer or after space)
         if (front) {
+            int startPos = bufLen - lettersLen;
+            if (startPos > 0 && buffer[startPos - 1] != ' ') {
+                continue;
+            }
             if (prefix != 0 && prefix != prefixPassed) continue;
-        } 
-        // End contraction: check last braille cell
+        }
+        // End contractions: check last braille cell prefix
         else if (brailleArr) {
-            byte lastBrailleCell = brailleArr[bufLen - 1];
-            if (prefix != 0 && prefix != lastBrailleCell) continue;
+            if (prefix != 0 && prefix != lastBraille) continue;
         }
 
         if (lettersLen > bestLen) {
@@ -691,22 +715,33 @@ void applyContraction(char* buffer, int& bufLen, byte* brailleArr = nullptr, byt
         }
     }
 
-    if (bestIndex >= 0) {
-        char contraction[16];
-        memcpy_P(contraction, uebContractions[bestIndex].contraction, 16);
-        contraction[15] = '\0';
-        int contractionLen = strlen(contraction);
+    if (bestIndex < 0) return;
 
-        // If end contraction, clear braille cells of replaced letters
-        if (!front && brailleArr) {
-            for (int k = bufLen - bestLen; k < bufLen; k++) brailleArr[k] = 0;
-        }
+    ::hasContraction = true;
 
-        // Replace letters with contraction
-        memcpy(buffer + bufLen - bestLen, contraction, contractionLen);
-        bufLen = bufLen - bestLen + contractionLen;
-        buffer[bufLen] = '\0';
+    // Load contraction string
+    char contraction[16];
+    memcpy_P(contraction, uebContractions[bestIndex].contraction, 16);
+    contraction[15] = '\0';
+    int contractionLen = strlen(contraction);
+
+    // Original letters from buffer
+    char original[16];
+    memcpy(original, buffer + bufLen - bestLen, bestLen);
+    original[bestLen] = '\0';
+
+    applyCaseStyle(original, contraction);
+
+    // End contraction clears braille cells
+    if (!front && brailleArr) {
+        for (int k = bufLen - bestLen; k < bufLen; k++)
+            brailleArr[k] = 0;
     }
+
+    // Replace letters with contraction
+    memcpy(buffer + bufLen - bestLen, contraction, contractionLen);
+    bufLen = bufLen - bestLen + contractionLen;
+    buffer[bufLen] = '\0';
 }
 
 void setFrontContraction(char* buffer, int& bufLen, byte prefixPassedToFunction) {
@@ -718,7 +753,7 @@ void setEndContraction(char* buffer, int& bufLen, byte* fullBufferBraille) {
 }
 
 void handleSpaceKeyDirect() {
-    char buf[128]; 
+    char buf[512]; 
     int bufLen = fullBuffer.length();
     fullBuffer.toCharArray(buf, sizeof(buf));
 
@@ -726,16 +761,30 @@ void handleSpaceKeyDirect() {
     setFrontContraction(buf, bufLen, contractionPrefix);
     
     fullBuffer = String(buf);
-    scrollWindow();
-    redrawLCDLine();
-    cursorPos = fullBuffer.length();
+
+    if (::hasContraction) {
+      cursorPos = fullBuffer.length();
+    }
+    ::hasContraction = false;
 }
 
 void startUP() {
+  lcd.clear();
   lcd.setCursor(0,0);
   lcd.print("  BrailleDuino  ");
   startupTone();
-  delay(2000);
+
+  int barWidth = 16;
+  int speed = 100; // milliseconds per step
+  for (int i = 0; i <= barWidth; i++) {
+      lcd.setCursor(0, 1); // bottom row
+      for (int j = 0; j < barWidth; j++) {
+          if (j <= i) lcd.print("#");
+          else lcd.print(" ");
+      }
+      delay(speed);
+  }
+
   updateLCDMode();
   scrollWindow();
   redrawLCDLine();
