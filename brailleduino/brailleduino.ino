@@ -930,7 +930,7 @@ void loop() {
 
 void handleKeyPress(char key) {
     switch(key) {
-        case '0': cycleMode(); break;
+        case '*': cycleMode(); break;
 
         // Braille dots - single press only
         case '2': brailleBits |= 1;   break;   // dot 1
@@ -940,7 +940,7 @@ void handleKeyPress(char key) {
         case '6': brailleBits |= 16;  break;   // dot 5
         case '9': brailleBits |= 32;  break;   // dot 6
 
-        case '*': // space
+        case '0': // space
             handleSpaceKeyDirect();
             insertSpaceAtCursor();
             if (currentMode = AUTO) currentMode = TEXT;
