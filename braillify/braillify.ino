@@ -62,7 +62,7 @@ byte contractionPrefix = 0;
 char lastKey = NO_KEY;
 unsigned long keyPressTime = 0; // when key was first pressed
 const unsigned long holdDelay = 800; // ms to wait before auto-repeat
-const unsigned long repeatRate = 100; // ms between repeats
+const unsigned long repeatRate = 120; // ms between repeats
 unsigned long nextRepeatTime = 0;
 
 BleKeyboard bleKeyboard("Braillify", "Group ano", 100);
@@ -393,19 +393,25 @@ void insertSpaceAtCursor() {
 
 // move cursor left/right
 void moveCursorLeft() {
-  if (cursorPos > 0) cursorPos--;
-  scrollWindow();
-  redrawLCDLine();
-  if (bluetoothEnabled && bleKeyboard.isConnected()) {
-      bleKeyboard.write(KEY_LEFT_ARROW);
+  if (cursorPos > 0) {
+      cursorPos--;
+      scrollWindow();
+      redrawLCDLine();
+
+      if (bluetoothEnabled && bleKeyboard.isConnected()) {
+          bleKeyboard.write(KEY_LEFT_ARROW);
+      }
   }
 }
 void moveCursorRight() {
-  if (cursorPos < fullBuffer.length()) cursorPos++;
-  scrollWindow();
-  redrawLCDLine();
-  if (bluetoothEnabled && bleKeyboard.isConnected()) {
-      bleKeyboard.write(KEY_RIGHT_ARROW);
+  if (cursorPos < fullBuffer.length()) {
+      cursorPos++;
+      scrollWindow();
+      redrawLCDLine();
+
+      if (bluetoothEnabled && bleKeyboard.isConnected()) {
+          bleKeyboard.write(KEY_RIGHT_ARROW);
+      }
   }
 }
 
@@ -448,9 +454,9 @@ void saveLineToEEPROM() {
   lcd.print("Saved to MEMORY ");
   saveTone();
   int barWidth = 16;
-  int speed = 20; // milliseconds per step
+  int speed = 20;
   for (int i = 0; i <= barWidth; i++) {
-      lcd.setCursor(0, 0); // bottom row
+      lcd.setCursor(0, 0);
       for (int j = 0; j < barWidth; j++) {
           if (j <= i) lcd.print("#");
           else lcd.print(" ");
@@ -461,36 +467,47 @@ void saveLineToEEPROM() {
 }
 
 void loadLineFromEEPROM() {
-  uint8_t marker = EEPROM.read(EEPROM_ADDR + MAX_CHARS);
-  if (marker != 0xA5) {
-    fullBuffer = "";
-    return;
-  }
-  fullBuffer = "";
-  for (int i = 0; i < MAX_CHARS; ++i) {
-    char c = (char)EEPROM.read(EEPROM_ADDR + i);
-    fullBuffer += c;
-  }
-  while (fullBuffer.length() > 0 && fullBuffer[fullBuffer.length()-1] == ' ') fullBuffer.remove(fullBuffer.length()-1);
-  cursorPos = fullBuffer.length();
-  windowStart = 0;
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("Load from MEMORY");
-  loadTone();
-  int barWidth = 16;
-  int speed = 30; // milliseconds per step
-  for (int i = 0; i <= barWidth; i++) {
-      lcd.setCursor(0, 1); // bottom row
-      for (int j = 0; j < barWidth; j++) {
-          if (j <= i) lcd.print("#");
-          else lcd.print(" ");
-      }
-      delay(speed);
-  }
-  updateLCDMode();
-  scrollWindow();
-  redrawLCDLine();
+    uint8_t marker = EEPROM.read(EEPROM_ADDR + MAX_CHARS);
+
+    // Load saved string
+    String loaded = "";
+    for (int i = 0; i < MAX_CHARS; ++i) {
+        char c = (char)EEPROM.read(EEPROM_ADDR + i);
+        loaded += c;
+    }
+
+    while (loaded.endsWith(" ")) {
+        loaded.remove(loaded.length() - 1);
+    }
+
+    if (loaded.length() == 0) return;
+  
+    lcd.setCursor(0, 0);
+    lcd.print("Loaded from MEM  ");   
+    loadTone();
+    delay(200);
+    int barWidth = 16;
+    int speed = 20;
+    for (int i = 0; i <= barWidth; i++) {
+        lcd.setCursor(0, 1);
+        for (int j = 0; j < barWidth; j++) {
+            if (j <= i) lcd.print("#");
+            else lcd.print(" ");
+        }
+        delay(speed);
+    }
+    fullBuffer += loaded;
+    cursorPos = fullBuffer.length();
+    scrollWindow();
+    redrawLCDLine();
+    updateLCDMode();
+
+    // Bluetooth send
+    if (bluetoothEnabled && bleKeyboard.isConnected()) {
+        bleKeyboard.write(KEY_END);
+        bleKeyboard.print(loaded);
+        // fix: may trailling space na hindi ko alam san galing
+    }
 }
 
 struct UEBContraction {
